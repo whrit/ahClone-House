@@ -200,21 +200,31 @@ frontend/src/routes/
 
 ---
 
-### Sprint 1: Site Audit Engine (2 weeks)
+### Sprint 1: Site Audit Engine (2 weeks) ✅ COMPLETED (2025-12-23)
 **Goal:** HTML crawl + hybrid JS rendering + issue detection
 
-| Task | Details | Files |
-|------|---------|-------|
-| Create Audit models | AuditRun, CrawledPage, Issue, LinkEdge | `backend/app/models/audit.py` |
-| Build HTML crawler | httpx-based async crawler | `backend/app/services/audit/crawler.py` |
-| Build JS renderer | Playwright integration | `backend/app/services/audit/renderer.py` |
-| Implement issue rules | Critical/High/Medium/Low rules | `backend/app/services/audit/analyzer.py` |
-| Create diff logic | New/resolved issue tracking | `backend/app/services/audit/differ.py` |
-| Create Celery task pipeline | Crawl → Render → Analyze → Diff | `backend/app/tasks/audit.py` |
-| Build Audit API routes | Run, status, issues, pages, export | `backend/app/api/routes/audits.py` |
-| Build Audit UI | Dashboard, issues table, page detail | `frontend/src/routes/_layout/projects/$projectId/audits/` |
+| Task | Details | Files | Status |
+|------|---------|-------|--------|
+| Create Audit models | AuditRun, CrawledPage, Issue, LinkEdge | `backend/app/models/audit.py` | ✅ |
+| Build HTML crawler | httpx-based async crawler | `backend/app/services/audit/crawler.py` | ✅ |
+| Build JS renderer | Playwright integration | `backend/app/services/audit/renderer.py` | ✅ |
+| Implement issue rules | Critical/High/Medium/Low rules | `backend/app/services/audit/analyzer.py` | ✅ |
+| Create diff logic | New/resolved issue tracking | `backend/app/services/audit/differ.py` | ✅ |
+| Create Celery task pipeline | Crawl → Render → Analyze → Diff | `backend/app/tasks/audit.py` | ✅ |
+| Build Audit API routes | Run, status, issues, pages, export | `backend/app/api/routes/audits.py` | ✅ |
+| Build Audit UI | Dashboard, issues table, page detail | `frontend/src/routes/_layout/projects/$projectId/audits/` | ✅ |
 
 **Deliverable:** Users can run audits and see prioritized issues
+
+**Completion Summary:**
+- 236 backend tests passing (100+ new audit tests)
+- Zero mypy type errors
+- Zero TypeScript/frontend build errors
+- 17 SEO issue types with 4 severity levels
+- Async crawler with robots.txt support and configurable limits
+- Playwright JS renderer with hybrid mode detection
+- Run-to-run diff tracking for new/resolved issues
+- Full audit frontend with filtering, pagination, and CSV export
 
 ---
 
