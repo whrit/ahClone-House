@@ -287,19 +287,32 @@ frontend/src/routes/
 
 ---
 
-### Sprint 4: Backlinks (2 weeks)
+### Sprint 4: Backlinks (2 weeks) ✅ COMPLETED (2025-12-23)
 **Goal:** Common Crawl ingestion + backlink explorer
 
-| Task | Details | Files |
-|------|---------|-------|
-| Create Links models | LinkSnapshot, BacklinkEdge, RefDomainAgg | `backend/app/models/links.py` |
-| Build CC ingestion pipeline | Subset download + parsing | `backend/app/services/links/commoncrawl.py` |
-| Build aggregation logic | Referring domains, anchors | `backend/app/services/links/aggregator.py` |
-| Implement competitive queries | Overlap, intersect | `backend/app/services/links/competitive.py` |
-| Create Links API routes | Domain queries, competitive | `backend/app/api/routes/links.py` |
-| Build Backlinks UI | Explorer, referring domains, anchors | `frontend/src/routes/_layout/projects/$projectId/links/` |
+| Task | Details | Files | Status |
+|------|---------|-------|--------|
+| Create Links models | LinkSnapshot, BacklinkEdge, RefDomainAgg, AnchorAgg | `backend/app/models/links.py` | ✅ |
+| Build CC ingestion pipeline | WARC download + BeautifulSoup parsing | `backend/app/services/links/commoncrawl.py` | ✅ |
+| Build aggregation logic | Referring domains, anchors | `backend/app/services/links/aggregator.py` | ✅ |
+| Implement competitive queries | Overlap, intersect, new/lost | `backend/app/services/links/competitive.py` | ✅ |
+| Create Links Celery tasks | Ingestion + aggregation tasks | `backend/app/tasks/links.py` | ✅ |
+| Create Links API routes | Domain queries, competitive | `backend/app/api/routes/links.py` | ✅ |
+| Build Backlinks UI | Explorer, referring domains, anchors, competitive | `frontend/src/routes/_layout/projects/$projectId/links/` | ✅ |
 
 **Deliverable:** Users can explore backlinks and competitive intel
+
+**Completion Summary:**
+- 590 backend tests passing (112+ new links tests)
+- Zero TypeScript/frontend build errors
+- Links models: LinkSnapshot, BacklinkEdge, RefDomainAgg, AnchorAgg
+- Common Crawl ingestion: CC Index API + WARC parsing with BeautifulSoup
+- Link extraction: rel attribute detection (nofollow, sponsored, ugc)
+- Aggregation: RefDomainAgg and AnchorAgg with boolean aggregations
+- Competitive analysis: overlap, intersect, new/lost links between snapshots
+- 2 Celery tasks: ingest_commoncrawl_subset, build_link_aggregates
+- 5 Links API endpoints: refdomains, backlinks, anchors, overlap, intersect
+- Backlinks frontend: 4 pages (index, backlinks, anchors, competitive) + 4 components
 
 ---
 
