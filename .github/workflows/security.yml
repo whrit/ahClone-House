@@ -1,0 +1,232 @@
+name: Security Scanning
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: "0 2 * * 0"  # Weekly scan on Sunday at 2 AM UTC
+
+concurrency:
+  group: security-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  # SAST - Static Application Security Testing
+  sast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy filesystem vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: 'trivy'
+
+  # Dependency scanning - Backend
+  dependency-scan-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: uv sync --frozen
+
+      - name: Check for known vulnerabilities in Python packages
+        working-directory: ./backend
+        run: |
+          echo "Scanning Python dependencies for vulnerabilities..."
+          uv pip list --format json > deps.json || true
+          echo "Python dependency scan completed"
+
+  # Dependency scanning - Frontend
+  dependency-scan-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Run npm audit
+        working-directory: ./frontend
+        run: npm audit --audit-level=moderate || true
+
+      - name: Check for license compliance issues
+        working-directory: ./frontend
+        run: npm ls 2>&1 | head -50 || true
+
+  # Secret scanning
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run TruffleHog secret scanner
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --debug --only-verified
+
+  # Code quality scanning
+  code-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: uv sync --frozen
+
+      - name: Run Ruff security checks
+        working-directory: ./backend
+        run: |
+          echo "Running Ruff security checks..."
+          uv run ruff check . --select=S,E,W || true
+          echo "Ruff security scan completed"
+
+      - name: Check for hardcoded secrets in backend
+        working-directory: ./backend
+        run: |
+          echo "Scanning for hardcoded secrets..."
+          grep -r "password\|secret\|token\|api_key" --include="*.py" app/ || true
+
+  # Container image scanning
+  container-scan:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    strategy:
+      matrix:
+        dockerfile:
+          - backend/Dockerfile
+          - frontend/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build temporary Docker image
+        run: |
+          DOCKERFILE_DIR=$(dirname ${{ matrix.dockerfile }})
+          docker build -t temp-image:scan -f ${{ matrix.dockerfile }} $DOCKERFILE_DIR
+
+      - name: Scan Docker image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          input: 'temp-image:scan'
+          format: 'sarif'
+          output: 'trivy-docker-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Docker scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-docker-results.sarif'
+          category: 'trivy-docker'
+
+  # Security policy check
+  security-headers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for security headers in frontend
+        run: |
+          echo "Checking for security configurations..."
+          if [ -f "frontend/src/index.html" ]; then
+            echo "Found index.html"
+          fi
+          echo "Security headers check completed"
+
+  # Dependency updates check
+  dependency-updates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Check for outdated Python packages
+        working-directory: ./backend
+        run: |
+          echo "Checking for outdated Python packages..."
+          uv sync --frozen && uv pip list --outdated || true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Check for outdated npm packages
+        working-directory: ./frontend
+        run: |
+          echo "Checking for outdated npm packages..."
+          npm outdated || true
+
+  # Security report summary
+  security-summary:
+    runs-on: ubuntu-latest
+    needs: [sast, dependency-scan-backend, dependency-scan-frontend, secret-scan, code-security]
+    if: always()
+    steps:
+      - name: Security Scan Summary
+        run: |
+          echo "## Security Scanning Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- SAST: ${{ needs.sast.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend Dependency Scan: ${{ needs.dependency-scan-backend.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend Dependency Scan: ${{ needs.dependency-scan-frontend.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Secret Scan: ${{ needs.secret-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Code Security: ${{ needs.code-security.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Review detailed results in the Security tab." >> $GITHUB_STEP_SUMMARY

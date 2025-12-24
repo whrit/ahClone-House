@@ -1,0 +1,279 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Determine deployment strategy
+  plan-deployment:
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.determine.outputs.environment }}
+      version: ${{ steps.determine.outputs.version }}
+      should_deploy: ${{ steps.determine.outputs.should_deploy }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine deployment environment and version
+        id: determine
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            ENV="${{ inputs.environment }}"
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            ENV="production"
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            ENV="staging"
+          else
+            ENV="none"
+          fi
+
+          VERSION="${{ github.ref }}"
+          if [[ "$VERSION" == refs/tags/* ]]; then
+            VERSION="${VERSION#refs/tags/}"
+          elif [[ "$VERSION" == refs/heads/* ]]; then
+            VERSION="${{ github.sha }}"
+          fi
+
+          if [[ "$ENV" != "none" ]]; then
+            SHOULD_DEPLOY="true"
+          else
+            SHOULD_DEPLOY="false"
+          fi
+
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "should_deploy=$SHOULD_DEPLOY" >> $GITHUB_OUTPUT
+
+  # Build and push Docker images
+  build-images:
+    runs-on: ubuntu-latest
+    needs: plan-deployment
+    if: needs.plan-deployment.outputs.should_deploy == 'true'
+    outputs:
+      backend-image: ${{ steps.images.outputs.backend-image }}
+      frontend-image: ${{ steps.images.outputs.frontend-image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+        if: secrets.DOCKER_USERNAME != ''
+
+      - name: Extract metadata (tags, labels)
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKER_REGISTRY }}/ahclone-backend
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Extract metadata (tags, labels) for frontend
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKER_REGISTRY }}/ahclone-frontend
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: ${{ secrets.DOCKER_USERNAME != '' }}
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
+          cache-from: type=registry
+          cache-to: type=inline
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: ${{ secrets.DOCKER_USERNAME != '' }}
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
+          cache-from: type=registry
+          cache-to: type=inline
+
+      - name: Output image tags
+        id: images
+        run: |
+          echo "backend-image=${{ steps.meta-backend.outputs.tags }}" >> $GITHUB_OUTPUT
+          echo "frontend-image=${{ steps.meta-frontend.outputs.tags }}" >> $GITHUB_OUTPUT
+
+  # Deploy to staging environment
+  deploy-staging:
+    if: needs.plan-deployment.outputs.environment == 'staging'
+    runs-on: ubuntu-latest
+    needs: [plan-deployment, build-images]
+    environment:
+      name: staging
+      url: ${{ secrets.STAGING_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy backend to staging
+        env:
+          DEPLOY_KEY: ${{ secrets.STAGING_DEPLOY_KEY }}
+          DEPLOY_HOST: ${{ secrets.STAGING_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.STAGING_DEPLOY_USER }}
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+          BACKEND_IMAGE: ${{ needs.build-images.outputs.backend-image }}
+          VERSION: ${{ needs.plan-deployment.outputs.version }}
+        run: |
+          echo "Deploying backend to staging..."
+          echo "Backend Image: $BACKEND_IMAGE"
+          echo "Version: $VERSION"
+          # Add your deployment script here
+          # Example: ./scripts/deploy-staging.sh
+
+      - name: Deploy frontend to staging
+        env:
+          DEPLOY_KEY: ${{ secrets.STAGING_DEPLOY_KEY }}
+          DEPLOY_HOST: ${{ secrets.STAGING_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.STAGING_DEPLOY_USER }}
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+          FRONTEND_IMAGE: ${{ needs.build-images.outputs.frontend-image }}
+          VERSION: ${{ needs.plan-deployment.outputs.version }}
+        run: |
+          echo "Deploying frontend to staging..."
+          echo "Frontend Image: $FRONTEND_IMAGE"
+          echo "Version: $VERSION"
+          # Add your deployment script here
+
+      - name: Run smoke tests
+        env:
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+        run: |
+          echo "Running smoke tests..."
+          # Add your smoke test script here
+          # Example: ./scripts/smoke-tests.sh
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "Staging deployment successful"
+          else
+            echo "Staging deployment failed"
+          fi
+
+  # Deploy to production environment
+  deploy-production:
+    if: needs.plan-deployment.outputs.environment == 'production'
+    runs-on: ubuntu-latest
+    needs: [plan-deployment, build-images]
+    environment:
+      name: production
+      url: ${{ secrets.PRODUCTION_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify production readiness
+        run: |
+          echo "Verifying production readiness..."
+          if [[ ! "${{ needs.plan-deployment.outputs.version }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "Invalid version tag format. Expected vX.Y.Z"
+            exit 1
+          fi
+          echo "Version verified: ${{ needs.plan-deployment.outputs.version }}"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.plan-deployment.outputs.version }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy backend to production
+        env:
+          DEPLOY_KEY: ${{ secrets.PRODUCTION_DEPLOY_KEY }}
+          DEPLOY_HOST: ${{ secrets.PRODUCTION_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.PRODUCTION_DEPLOY_USER }}
+          PRODUCTION_URL: ${{ secrets.PRODUCTION_URL }}
+          BACKEND_IMAGE: ${{ needs.build-images.outputs.backend-image }}
+          VERSION: ${{ needs.plan-deployment.outputs.version }}
+        run: |
+          echo "Deploying backend to production..."
+          echo "Backend Image: $BACKEND_IMAGE"
+          echo "Version: $VERSION"
+          # Add your deployment script here
+          # Example: ./scripts/deploy-production.sh
+
+      - name: Deploy frontend to production
+        env:
+          DEPLOY_KEY: ${{ secrets.PRODUCTION_DEPLOY_KEY }}
+          DEPLOY_HOST: ${{ secrets.PRODUCTION_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.PRODUCTION_DEPLOY_USER }}
+          PRODUCTION_URL: ${{ secrets.PRODUCTION_URL }}
+          FRONTEND_IMAGE: ${{ needs.build-images.outputs.frontend-image }}
+          VERSION: ${{ needs.plan-deployment.outputs.version }}
+        run: |
+          echo "Deploying frontend to production..."
+          echo "Frontend Image: $FRONTEND_IMAGE"
+          echo "Version: $VERSION"
+          # Add your deployment script here
+
+      - name: Run health checks
+        env:
+          PRODUCTION_URL: ${{ secrets.PRODUCTION_URL }}
+        run: |
+          echo "Running health checks..."
+          # Add your health check script here
+          # Example: ./scripts/health-checks.sh
+
+      - name: Notify production deployment
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "Production deployment successful - ${{ needs.plan-deployment.outputs.version }}"
+          else
+            echo "Production deployment failed - ${{ needs.plan-deployment.outputs.version }}"
+          fi
+
+  # Deployment complete notification
+  deployment-complete:
+    runs-on: ubuntu-latest
+    needs: [plan-deployment]
+    if: always() && needs.plan-deployment.outputs.should_deploy == 'true'
+    steps:
+      - name: Summary
+        run: |
+          echo "Deployment Summary"
+          echo "Environment: ${{ needs.plan-deployment.outputs.environment }}"
+          echo "Version: ${{ needs.plan-deployment.outputs.version }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Ref: ${{ github.ref }}"

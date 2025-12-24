@@ -1,0 +1,48 @@
+# Production Deployment Guide
+
+## Table of Contents
+
+1. [Prerequisites](#prerequisites)
+2. [Architecture Overview](#architecture-overview)
+3. [Environment Configuration](#environment-configuration)
+4. [Docker Deployment](#docker-deployment)
+5. [Cloud Deployment Options](#cloud-deployment-options)
+6. [Database Setup](#database-setup)
+7. [Security Configuration](#security-configuration)
+8. [Monitoring & Observability](#monitoring--observability)
+9. [Backup & Recovery](#backup--recovery)
+10. [Troubleshooting](#troubleshooting)
+
+---
+
+## Prerequisites
+
+### Required Software
+
+- **Docker Engine**: v24.0+ (not Docker Desktop for production servers)
+- **Docker Compose**: v2.x or later
+- **PostgreSQL**: 17+ (or managed RDS/Cloud SQL/DigitalOcean Managed Database)
+- **Redis**: 7+ (or managed ElastiCache/MemoryStore/DigitalOcean Managed Redis)
+- **Domain**: Registered domain with DNS access
+- **SSL Certificate**: Let's Encrypt (automatic via Traefik) or custom certificate
+
+### Cloud Provider Account (Choose One)
+
+- **AWS**: Account with IAM permissions for ECS, RDS, ElastiCache, ECR
+- **Google Cloud Platform**: Account with permissions for Cloud Run, Cloud SQL, Memorystore, Artifact Registry
+- **DigitalOcean**: Account for App Platform, Managed Databases, Container Registry
+- **Self-Hosted**: VPS/Dedicated server with minimum 2 CPU cores, 4GB RAM, 40GB storage
+
+### Development Tools
+
+- `git` for version control
+- `ssh` for server access
+- `openssl` for generating secrets
+- `curl` or `wget` for testing endpoints
+
+### Knowledge Requirements
+
+- Basic Linux command line proficiency
+- Understanding of Docker and containerization
+- Familiarity with environment variables and configuration management
+- Basic networking knowledge (DNS, SSL/TLS, HTTP/HTTPS)

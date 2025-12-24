@@ -1,46 +1,157 @@
 version: 2
 updates:
-  # GitHub Actions
+  # GitHub Actions - Daily updates
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: daily
+      time: "03:00"
+      timezone: "UTC"
     commit-message:
-      prefix: ⬆
-    labels: [dependencies, internal]
-  # Python uv
+      prefix: "ci: "
+      include: scope
+    labels: [dependencies, github-actions]
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    reviewers:
+      - "@beckett"
+    allow:
+      - dependency-type: "all"
+    open-pull-requests-limit: 5
+
+  # Python uv dependencies - Weekly updates
   - package-ecosystem: uv
     directory: /backend
     schedule:
       interval: weekly
+      day: monday
+      time: "03:00"
+      timezone: "UTC"
     commit-message:
-      prefix: ⬆
-    labels: [dependencies, internal]
-  # npm
+      prefix: "chore(backend): "
+      include: scope
+    labels: [dependencies, backend, python]
+    groups:
+      development-dependencies:
+        dependency-type: "dev"
+        patterns:
+          - "pytest*"
+          - "mypy"
+          - "ruff"
+          - "coverage*"
+      testing-dependencies:
+        patterns:
+          - "pytest*"
+          - "respx"
+          - "pytest-asyncio"
+          - "fakeredis"
+      core-dependencies:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "pytest*"
+          - "mypy"
+          - "ruff"
+          - "coverage*"
+          - "respx"
+          - "pytest-asyncio"
+          - "fakeredis"
+    reviewers:
+      - "@beckett"
+    allow:
+      - dependency-type: "all"
+    pull-request-branch-name:
+      separator: "/"
+    open-pull-requests-limit: 5
+
+  # npm dependencies - Weekly updates
   - package-ecosystem: npm
     directory: /frontend
     schedule:
       interval: weekly
+      day: monday
+      time: "04:00"
+      timezone: "UTC"
     commit-message:
-      prefix: ⬆
-    labels: [dependencies, internal]
+      prefix: "chore(frontend): "
+      include: scope
+    labels: [dependencies, frontend, javascript]
+    groups:
+      development-dependencies:
+        dependency-type: "dev"
+        patterns:
+          - "typescript"
+          - "@biomejs/biome"
+          - "@playwright/*"
+          - "@types/*"
+      testing-dependencies:
+        patterns:
+          - "@playwright/*"
+      ui-dependencies:
+        patterns:
+          - "@radix-ui/*"
+          - "tailwindcss*"
+          - "lucide-react"
+      core-dependencies:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@tanstack/*"
+    reviewers:
+      - "@beckett"
     ignore:
       - dependency-name: "@hey-api/openapi-ts"
-  # Docker
+    allow:
+      - dependency-type: "all"
+    pull-request-branch-name:
+      separator: "/"
+    open-pull-requests-limit: 5
+
+  # Docker base images - Weekly updates
   - package-ecosystem: docker
-    directories:
-      - /backend
-      - /frontend
+    directory: /backend
     schedule:
       interval: weekly
+      day: tuesday
+      time: "03:00"
+      timezone: "UTC"
     commit-message:
-      prefix: ⬆
-    labels: [dependencies, internal]
-  # Docker Compose
+      prefix: "chore(docker): "
+      include: scope
+    labels: [dependencies, docker, backend]
+    reviewers:
+      - "@beckett"
+    open-pull-requests-limit: 3
+
+  - package-ecosystem: docker
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: "03:00"
+      timezone: "UTC"
+    commit-message:
+      prefix: "chore(docker): "
+      include: scope
+    labels: [dependencies, docker, frontend]
+    reviewers:
+      - "@beckett"
+    open-pull-requests-limit: 3
+
+  # Docker Compose - Weekly updates
   - package-ecosystem: docker-compose
     directory: /
     schedule:
       interval: weekly
+      day: tuesday
+      time: "03:00"
+      timezone: "UTC"
     commit-message:
-      prefix: ⬆
-    labels: [dependencies, internal]
+      prefix: "chore(docker-compose): "
+      include: scope
+    labels: [dependencies, docker-compose, infra]
+    reviewers:
+      - "@beckett"
+    open-pull-requests-limit: 3
