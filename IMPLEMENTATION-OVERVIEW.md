@@ -228,21 +228,36 @@ frontend/src/routes/
 
 ---
 
-### Sprint 2: GSC Integration (2 weeks)
+### Sprint 2: GSC Integration (2 weeks) ✅ COMPLETED (2025-12-23)
 **Goal:** OAuth connect + data ingestion + keyword tooling
 
-| Task | Details | Files |
-|------|---------|-------|
-| Add Google OAuth | Token storage with encryption | `backend/app/core/oauth/google.py` |
-| Create GSC models | GSCProperty, GSCQueryDaily, KeywordCluster | `backend/app/models/gsc.py` |
-| Build GSC client | Search Analytics API wrapper | `backend/app/services/gsc/client.py` |
-| Build ingestion pipeline | Daily sync + backfill | `backend/app/services/gsc/ingestor.py` |
-| Implement opportunity scoring | High impressions + low CTR logic | `backend/app/services/gsc/opportunities.py` |
-| Implement query clustering | N-gram overlap clustering | `backend/app/services/gsc/clustering.py` |
-| Create GSC API routes | Connect, sync, explorers | `backend/app/api/routes/gsc.py` |
-| Build Keywords UI | Query/page explorers, opportunities | `frontend/src/routes/_layout/projects/$projectId/keywords/` |
+| Task | Details | Files | Status |
+|------|---------|-------|--------|
+| Add Google OAuth | Token storage with encryption | `backend/app/core/oauth/google.py` | ✅ |
+| Create GSC models | GSCProperty, GSCQueryDaily, KeywordCluster | `backend/app/models/gsc.py` | ✅ |
+| Build GSC client | Search Analytics API wrapper | `backend/app/services/gsc/client.py` | ✅ |
+| Build ingestion pipeline | Daily sync + backfill | `backend/app/services/gsc/ingestor.py` | ✅ |
+| Implement opportunity scoring | High impressions + low CTR logic | `backend/app/services/gsc/opportunities.py` | ✅ |
+| Implement query clustering | N-gram overlap clustering | `backend/app/services/gsc/clustering.py` | ✅ |
+| Create GSC API routes | Connect, sync, explorers | `backend/app/api/routes/gsc.py` | ✅ |
+| Build Keywords UI | Query/page explorers, opportunities | `frontend/src/routes/_layout/projects/$projectId/keywords/` | ✅ |
 
 **Deliverable:** Users can connect GSC and explore keyword data
+
+**Completion Summary:**
+- 383 backend tests passing (100+ new GSC tests)
+- Zero mypy type errors
+- Zero TypeScript/frontend build errors
+- Google OAuth with Fernet token encryption
+- IntegrationAccount model for OAuth token storage
+- GSC models: GSCProperty, GSCQueryDaily, GSCPageDaily, KeywordCluster, KeywordClusterMember
+- GSC API client with Search Analytics API pagination (25k rows/request)
+- Data ingestion pipeline with daily sync + backfill
+- 4 opportunity types: LOW_CTR, POSITION_8_20, RISING, FALLING
+- N-gram based query clustering with Jaccard similarity
+- 4 Celery tasks: sync_gsc_property, backfill_gsc_data, compute_opportunities, cluster_queries
+- 11 GSC API endpoints + OAuth flow endpoints
+- Full Keywords frontend: Query Explorer, Page Explorer, Opportunities, Clusters
 
 ---
 
